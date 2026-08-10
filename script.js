@@ -55,6 +55,16 @@ const EXTRA_ANIMALS = [
 ];
 
 const ANIMAL_ROSTER = ANIMALS.concat(EXTRA_ANIMALS);
+let animalOrder = ANIMAL_ROSTER.slice();
+
+function shuffleArray(arr) {
+  const copy = arr.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
 const FRAMES = [
   { id: "square", label: "▢ Квадрат", cls: "frame-square" },
@@ -86,6 +96,7 @@ const popCountEl = document.getElementById("popCount");
 const resetBtn = document.getElementById("resetBtn");
 const musicToggle = document.getElementById("musicToggle");
 const settingsToggle = document.getElementById("settingsToggle");
+const shuffleAnimalsBtn = document.getElementById("shuffleAnimalsBtn");
 const controls = document.getElementById("controls");
 const shapeRow = document.getElementById("shapeRow");
 const animalsToggle = document.getElementById("animalsToggle");
@@ -164,9 +175,10 @@ function getNoiseBuffer(ctx) {
   return noiseBuffer;
 }
 
-// Realistic silicone "pop": a filtered noise transient (the "thock") layered
-// with a fast pitch-dropping sub tone (the "body"), so it sounds like a real
-// bubble popping rather than a synth blip. Pitch varies slightly per bubble.
+// Satisfying "pop": a filtered noise click (the "thock") + a fast
+// pitch-dropping sub tone (the "body") + a bright upward chirp "sparkle"
+// tail, so each pop has a little addictive shimmer instead of a flat blip.
+// Pitch varies slightly per bubble so a popping streak feels lively.
 function playPop(index) {
   ensureAudioReady(() => firePop(index));
 }
@@ -207,10 +219,26 @@ function firePop(index) {
   osc.connect(oscGain);
   oscGain.connect(ctx.destination);
 
+  // Bright chirp sparkle — a quick upward sweep that decays away, giving the
+  // pop a satisfying, slightly playful "twinkle" right after the thock.
+  const chirp = ctx.createOscillator();
+  chirp.type = "triangle";
+  chirp.frequency.setValueAtTime(900 * pitchMul, now + 0.012);
+  chirp.frequency.exponentialRampToValueAtTime(2200 * pitchMul, now + 0.06);
+  const chirpGain = ctx.createGain();
+  chirpGain.gain.setValueAtTime(0.0001, now + 0.012);
+  chirpGain.gain.exponentialRampToValueAtTime(0.16, now + 0.022);
+  chirpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+
+  chirp.connect(chirpGain);
+  chirpGain.connect(ctx.destination);
+
   noiseSrc.start(now);
   noiseSrc.stop(now + 0.05);
   osc.start(now);
   osc.stop(now + 0.11);
+  chirp.start(now + 0.012);
+  chirp.stop(now + 0.11);
 }
 
 // Procedurally generated lo-fi funk style loop (bass + soft chord pad + hats),
@@ -311,7 +339,7 @@ function stopMusic() {
 musicToggle.addEventListener("click", () => {
   musicOn = !musicOn;
   musicToggle.classList.toggle("muted", !musicOn);
-  musicToggle.textContent = musicOn ? "🎵 Музыка" : "🔇 Музыка";
+  musicToggle.textContent = musicOn ? "🎵" : "🔇";
   if (musicOn) startMusic();
   else stopMusic();
 });
@@ -394,22 +422,37 @@ function applyFrameClipping() {
 }
 
 function applyAnimalFaces() {
+  bubbles.forEach((btn) => {
+    if (!state.animalsOn) {
+      btn.classList.remove("has-animal");
+      btn.textContent = "";
+      btn.style.fontSize = "";
+    }
+  });
   if (!state.animalsOn) return;
+
   const visible = bubbles.filter((btn) => !btn.classList.contains("bubble-hidden"));
   if (!visible.length) return;
 
   // All bubbles share one fixed aspect-ratio square size, so measure it once
   // (not per-bubble mid-loop) — otherwise assigning text/font-size to earlier
   // bubbles could shift layout before later ones are measured, producing
-  // mismatched sizes row to row.
+  // mismatched sizes row to row. The bubble itself clips overflow, so we can
+  // size well past 100% and let it crop cleanly to the full circle.
   const cellSize = visible[0].getBoundingClientRect().width;
-  const fontSize = Math.round(cellSize * 0.8) + "px";
+  const fontSize = Math.round(cellSize * 1.15) + "px";
 
   visible.forEach((btn, i) => {
-    btn.textContent = ANIMAL_ROSTER[i % ANIMAL_ROSTER.length].emoji;
+    btn.textContent = animalOrder[i % animalOrder.length].emoji;
     btn.classList.add("has-animal");
     btn.style.fontSize = fontSize;
   });
+}
+
+function shuffleAnimals() {
+  if (!state.animalsOn) return;
+  animalOrder = shuffleArray(ANIMAL_ROSTER);
+  applyAnimalFaces();
 }
 
 /* ================= BOARD ================= */
@@ -445,6 +488,7 @@ function buildBoard() {
         playPop(noteIndex);
         popCount++;
         popCountEl.textContent = popCount;
+        maybeAutoReset();
       });
 
       board.appendChild(btn);
@@ -462,6 +506,17 @@ function resetBoard() {
     btn.classList.remove("down");
     btn.classList.add("up");
   });
+}
+
+// Once every poppable bubble has been popped, return the whole board on its
+// own after a short beat so the player never has to reach for the reset
+// button mid-flow.
+function maybeAutoReset() {
+  const poppable = bubbles.filter((btn) => !btn.classList.contains("bubble-hidden"));
+  const allPopped = poppable.length > 0 && poppable.every((btn) => btn.dataset.popped === "true");
+  if (allPopped) {
+    setTimeout(resetBoard, 550);
+  }
 }
 
 /* ================= CONTROLS ================= */
@@ -486,6 +541,7 @@ function buildShapeRow() {
     state.animalsOn = !state.animalsOn;
     animalsToggle.classList.toggle("on", state.animalsOn);
     animalsToggle.textContent = state.animalsOn ? "🐾 Животные вкл." : "🐾 Животные выкл.";
+    shuffleAnimalsBtn.classList.toggle("hidden", !state.animalsOn);
     buildBoard();
   });
 }
@@ -567,6 +623,7 @@ settingsToggle.addEventListener("click", () => {
 });
 
 resetBtn.addEventListener("click", resetBoard);
+shuffleAnimalsBtn.addEventListener("click", shuffleAnimals);
 
 buildShapeRow();
 buildFrameRow();

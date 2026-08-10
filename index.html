@@ -17,23 +17,15 @@
 
   <div class="app">
     <div class="title-bar">
+      <div class="pop-counter"><span id="popCount">0</span><span class="pop-counter-label">хлопков</span></div>
       <h1 class="game-title">Мирая <span class="heart">💜</span></h1>
-    </div>
-
-    <header class="topbar">
-      <div class="stats">
-        <span id="popCount">0</span> хлопков
+      <div class="header-actions">
+        <button id="musicToggle" class="icon-btn" title="Музыка">🎵</button>
+        <button id="resetBtn" class="icon-btn" title="Вернуть все пупырки">↺</button>
+        <button id="settingsToggle" class="icon-btn" title="Настройки Pop It">⚙️</button>
+        <button id="shuffleAnimalsBtn" class="icon-btn hidden" title="Перемешать животных">⇅</button>
       </div>
-      <button id="musicToggle" class="music-toggle">🎵 Музыка</button>
-      <button id="resetBtn" class="reset-btn" title="Вернуть все пупырки">
-        <span class="reset-icon">↺</span> Вернуть пупырки
-      </button>
-    </header>
-
-    <button id="settingsToggle" class="settings-toggle">
-      <span>⚙️ Настройки Pop It</span>
-      <span class="chevron">▾</span>
-    </button>
+    </div>
 
     <section class="controls collapsed" id="controls">
       <div class="control-group">
