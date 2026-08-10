@@ -163,6 +163,7 @@ body {
 }
 
 .bubble {
+  aspect-ratio: 1 / 1;
   border: none;
   border-radius: 50%;
   padding: 0;
@@ -212,13 +213,13 @@ body {
   clip-path: url(#heartClip);
 }
 
-.bubble.shape-animals {
+.bubble.has-animal {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 86%;
   line-height: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  overflow: visible;
 }
 
 .bubble.bubble-hidden {

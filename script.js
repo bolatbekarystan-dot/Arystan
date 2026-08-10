@@ -4,12 +4,12 @@ const SHAPES = [
   { id: "triangle", label: "🔺", cls: "shape-triangle" },
   { id: "heart", label: "❤️", cls: "shape-heart" },
   { id: "octagon", label: "🛑", cls: "shape-octagon" },
-  { id: "animals", label: "🐾 Животные", cls: "shape-circle shape-animals" },
 ];
 
-// Always-present roster — cycles with duplicates to fill boards bigger than
-// 12 bubbles, and is reassigned fresh on every board rebuild (size/frame
-// change) so every animal is represented again among the visible bubbles.
+// Mandatory roster — must always appear at least once among the visible
+// bubbles whenever there's room. Reassigned fresh on every board rebuild
+// (size/frame/shape change), and overlaid on top of whatever bubble shape
+// and color are currently active rather than replacing them.
 const ANIMALS = [
   { id: "panda", emoji: "🐼" },
   { id: "rabbit", emoji: "🐰" },
@@ -24,6 +24,37 @@ const ANIMALS = [
   { id: "cat", emoji: "🐱" },
   { id: "octopus", emoji: "🐙" },
 ];
+
+// Extra variety used to fill boards larger than the 12 mandatory animals,
+// so duplicates only start repeating after ALL of these are used too.
+const EXTRA_ANIMALS = [
+  { id: "tiger", emoji: "🐯" },
+  { id: "koala", emoji: "🐨" },
+  { id: "monkey", emoji: "🐵" },
+  { id: "fox", emoji: "🦊" },
+  { id: "pig", emoji: "🐷" },
+  { id: "mouse", emoji: "🐭" },
+  { id: "hamster", emoji: "🐹" },
+  { id: "turtle", emoji: "🐢" },
+  { id: "penguin", emoji: "🐧" },
+  { id: "giraffe", emoji: "🦒" },
+  { id: "elephant", emoji: "🐘" },
+  { id: "zebra", emoji: "🦓" },
+  { id: "hedgehog", emoji: "🦔" },
+  { id: "squirrel", emoji: "🐿️" },
+  { id: "bat", emoji: "🦇" },
+  { id: "bee", emoji: "🐝" },
+  { id: "butterfly", emoji: "🦋" },
+  { id: "whale", emoji: "🐳" },
+  { id: "shark", emoji: "🦈" },
+  { id: "wolf", emoji: "🐺" },
+  { id: "deer", emoji: "🦌" },
+  { id: "crocodile", emoji: "🐊" },
+  { id: "kangaroo", emoji: "🦘" },
+  { id: "camel", emoji: "🐫" },
+];
+
+const ANIMAL_ROSTER = ANIMALS.concat(EXTRA_ANIMALS);
 
 const FRAMES = [
   { id: "square", label: "▢ Квадрат", cls: "frame-square" },
@@ -57,6 +88,7 @@ const musicToggle = document.getElementById("musicToggle");
 const settingsToggle = document.getElementById("settingsToggle");
 const controls = document.getElementById("controls");
 const shapeRow = document.getElementById("shapeRow");
+const animalsToggle = document.getElementById("animalsToggle");
 const frameRow = document.getElementById("frameRow");
 const sizeRow = document.getElementById("sizeRow");
 const paletteRow = document.getElementById("paletteRow");
@@ -70,6 +102,7 @@ let state = {
   palette: "pastel",
   paintMode: false,
   paintColor: PAINT_COLORS[0],
+  animalsOn: false,
 };
 
 let popCount = 0;
@@ -361,10 +394,21 @@ function applyFrameClipping() {
 }
 
 function applyAnimalFaces() {
-  if (state.shape.id !== "animals") return;
+  if (!state.animalsOn) return;
   const visible = bubbles.filter((btn) => !btn.classList.contains("bubble-hidden"));
+  if (!visible.length) return;
+
+  // All bubbles share one fixed aspect-ratio square size, so measure it once
+  // (not per-bubble mid-loop) — otherwise assigning text/font-size to earlier
+  // bubbles could shift layout before later ones are measured, producing
+  // mismatched sizes row to row.
+  const cellSize = visible[0].getBoundingClientRect().width;
+  const fontSize = Math.round(cellSize * 0.8) + "px";
+
   visible.forEach((btn, i) => {
-    btn.textContent = ANIMALS[i % ANIMALS.length].emoji;
+    btn.textContent = ANIMAL_ROSTER[i % ANIMAL_ROSTER.length].emoji;
+    btn.classList.add("has-animal");
+    btn.style.fontSize = fontSize;
   });
 }
 
@@ -436,6 +480,13 @@ function buildShapeRow() {
       btn.classList.add("active");
     });
     shapeRow.appendChild(btn);
+  });
+
+  animalsToggle.addEventListener("click", () => {
+    state.animalsOn = !state.animalsOn;
+    animalsToggle.classList.toggle("on", state.animalsOn);
+    animalsToggle.textContent = state.animalsOn ? "🐾 Животные вкл." : "🐾 Животные выкл.";
+    buildBoard();
   });
 }
 
