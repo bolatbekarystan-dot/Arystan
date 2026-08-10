@@ -11,8 +11,8 @@
 }
 
 html, body {
-  height: 100%;
   margin: 0;
+  min-height: 100%;
 }
 
 body {
@@ -21,15 +21,15 @@ body {
               radial-gradient(circle at 80% 0%, var(--bg2), transparent 55%),
               linear-gradient(160deg, #fef9f4, #e9f3ff);
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .app {
   width: 100%;
   max-width: 640px;
+  margin: 0 auto;
   padding: 16px;
   display: flex;
   flex-direction: column;

@@ -75,6 +75,36 @@ function getAudioCtx() {
   return audioCtx;
 }
 
+// Mobile browsers (especially iOS Safari) create AudioContext in a
+// "suspended" state and only let it start inside a direct user gesture, and
+// only after resume() has actually settled — scheduling sound before that
+// resolves gets silently dropped. This runs the given function once the
+// context is guaranteed to be running.
+function ensureAudioReady(run) {
+  const ctx = getAudioCtx();
+  if (ctx.state === "suspended") {
+    ctx.resume().then(run);
+  } else {
+    run();
+  }
+}
+
+// Standard mobile unlock trick: play a silent buffer during the very first
+// touch/click anywhere on the page so the audio hardware path opens up
+// before we ever need it for a pop or the music.
+function unlockAudioOnce() {
+  const ctx = getAudioCtx();
+  if (ctx.state === "suspended") ctx.resume();
+  const buffer = ctx.createBuffer(1, 1, 22050);
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(ctx.destination);
+  src.start(0);
+}
+["touchstart", "pointerdown", "click"].forEach((evt) => {
+  document.addEventListener(evt, unlockAudioOnce, { once: true, capture: true });
+});
+
 function getNoiseBuffer(ctx) {
   if (!noiseBuffer) {
     const bufferSize = ctx.sampleRate * 0.3;
@@ -89,8 +119,11 @@ function getNoiseBuffer(ctx) {
 // with a fast pitch-dropping sub tone (the "body"), so it sounds like a real
 // bubble popping rather than a synth blip. Pitch varies slightly per bubble.
 function playPop(index) {
+  ensureAudioReady(() => firePop(index));
+}
+
+function firePop(index) {
   const ctx = getAudioCtx();
-  if (ctx.state === "suspended") ctx.resume();
   const now = ctx.currentTime;
 
   const semitoneShift = ((index % 8) - 4) * 0.6 + (Math.random() - 0.5) * 1.5;
@@ -214,11 +247,11 @@ function getTempo() {
 }
 
 function startMusic() {
-  const ctx = getAudioCtx();
-  if (ctx.state === "suspended") ctx.resume();
-  nextNoteTime = ctx.currentTime + 0.1;
-  musicStep = 0;
-  scheduleMusic();
+  ensureAudioReady(() => {
+    nextNoteTime = audioCtx.currentTime + 0.1;
+    musicStep = 0;
+    scheduleMusic();
+  });
 }
 
 function stopMusic() {
