@@ -4,9 +4,25 @@ const SHAPES = [
   { id: "triangle", label: "🔺", cls: "shape-triangle" },
   { id: "heart", label: "❤️", cls: "shape-heart" },
   { id: "octagon", label: "🛑", cls: "shape-octagon" },
-  { id: "dino", label: "🦕", cls: "shape-emoji", emoji: "🦕" },
-  { id: "unicorn", label: "🦄", cls: "shape-emoji", emoji: "🦄" },
-  { id: "panda", label: "🐼", cls: "shape-emoji", emoji: "🐼" },
+  { id: "animals", label: "🐾 Животные", cls: "shape-circle shape-animals" },
+];
+
+// Always-present roster — cycles with duplicates to fill boards bigger than
+// 12 bubbles, and is reassigned fresh on every board rebuild (size/frame
+// change) so every animal is represented again among the visible bubbles.
+const ANIMALS = [
+  { id: "panda", emoji: "🐼" },
+  { id: "rabbit", emoji: "🐰" },
+  { id: "chicken", emoji: "🐔" },
+  { id: "horse", emoji: "🐴" },
+  { id: "frog", emoji: "🐸" },
+  { id: "cow", emoji: "🐮" },
+  { id: "lion", emoji: "🦁" },
+  { id: "owl", emoji: "🦉" },
+  { id: "duck", emoji: "🦆" },
+  { id: "dog", emoji: "🐶" },
+  { id: "cat", emoji: "🐱" },
+  { id: "octopus", emoji: "🐙" },
 ];
 
 const FRAMES = [
@@ -267,6 +283,91 @@ musicToggle.addEventListener("click", () => {
   else stopMusic();
 });
 
+/* ================= FRAME-FIT GEOMETRY ================= */
+// The board's frame shape is applied via CSS clip-path/border-radius on the
+// board element itself. Grid cells near the edges can end up only partially
+// inside that clip, rendering as ugly half-cut bubbles. Instead we test each
+// bubble against the same shape (in the board's own 0..1 normalized space)
+// and fully hide any bubble that isn't entirely inside it.
+
+const OCTAGON_POLY = [
+  [0.28, 0], [0.72, 0], [1, 0.28], [1, 0.72],
+  [0.72, 1], [0.28, 1], [0, 0.72], [0, 0.28],
+];
+
+const HEART_PATH_D =
+  "M0.5,0.9 C0.1,0.62 -0.05,0.32 0.15,0.13 C0.3,-0.02 0.48,0.05 0.5,0.22 " +
+  "C0.52,0.05 0.7,-0.02 0.85,0.13 C1.05,0.32 0.9,0.62 0.5,0.9 Z";
+let heartPolyCache = null;
+
+function pointInPolygon(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function getHeartPolygon() {
+  if (!heartPolyCache) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", HEART_PATH_D);
+    const len = path.getTotalLength();
+    const samples = 96;
+    heartPolyCache = [];
+    for (let i = 0; i <= samples; i++) {
+      const pt = path.getPointAtLength((len * i) / samples);
+      heartPolyCache.push([pt.x, pt.y]);
+    }
+  }
+  return heartPolyCache;
+}
+
+function pointInFrame(frameId, x, y) {
+  if (frameId === "circle") {
+    const dx = x - 0.5;
+    const dy = y - 0.5;
+    return dx * dx + dy * dy <= 0.25;
+  }
+  if (frameId === "octagon") return pointInPolygon(x, y, OCTAGON_POLY);
+  if (frameId === "heart") return pointInPolygon(x, y, getHeartPolygon());
+  return true; // square frame never clips
+}
+
+function applyFrameClipping() {
+  if (state.frame.id === "square") return;
+  const boardRect = board.getBoundingClientRect();
+  if (!boardRect.width || !boardRect.height) return;
+
+  bubbles.forEach((btn) => {
+    const r = btn.getBoundingClientRect();
+    const cx = (r.left + r.width / 2 - boardRect.left) / boardRect.width;
+    const cy = (r.top + r.height / 2 - boardRect.top) / boardRect.height;
+    const hw = r.width / 2 / boardRect.width;
+    const hh = r.height / 2 / boardRect.height;
+    const samplePoints = [
+      [cx, cy],
+      [cx - hw, cy],
+      [cx + hw, cy],
+      [cx, cy - hh],
+      [cx, cy + hh],
+    ];
+    const fits = samplePoints.every(([x, y]) => pointInFrame(state.frame.id, x, y));
+    btn.classList.toggle("bubble-hidden", !fits);
+  });
+}
+
+function applyAnimalFaces() {
+  if (state.shape.id !== "animals") return;
+  const visible = bubbles.filter((btn) => !btn.classList.contains("bubble-hidden"));
+  visible.forEach((btn, i) => {
+    btn.textContent = ANIMALS[i % ANIMALS.length].emoji;
+  });
+}
+
 /* ================= BOARD ================= */
 
 function buildBoard() {
@@ -284,7 +385,6 @@ function buildBoard() {
       btn.className = `bubble up ${state.shape.cls}`;
       btn.style.background = palette[(row + col) % palette.length];
       btn.dataset.popped = "false";
-      if (state.shape.emoji) btn.textContent = state.shape.emoji;
       const noteIndex = row + col;
 
       btn.addEventListener("pointerdown", () => {
@@ -307,6 +407,9 @@ function buildBoard() {
       bubbles.push(btn);
     }
   }
+
+  applyFrameClipping();
+  applyAnimalFaces();
 }
 
 function resetBoard() {
